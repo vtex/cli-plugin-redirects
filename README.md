@@ -31,7 +31,7 @@ $ npm install -g @vtex/cli-plugin-redirects
 $ oclif-example COMMAND
 running command...
 $ oclif-example (-v|--version|version)
-@vtex/cli-plugin-redirects/0.1.2 linux-x64 node-v12.21.0
+@vtex/cli-plugin-redirects/1.0.0 linux-x64 node-v12.22.1
 $ oclif-example --help [COMMAND]
 USAGE
   $ oclif-example COMMAND
@@ -66,7 +66,7 @@ EXAMPLE
   vtex redirects delete csvPath
 ```
 
-_See code: [build/commands/redirects/delete.ts](https://github.com/vtex/cli-plugin-redirects/blob/v0.1.2/build/commands/redirects/delete.ts)_
+_See code: [build/commands/redirects/delete.ts](https://github.com/vtex/cli-plugin-redirects/blob/v1.0.0/build/commands/redirects/delete.ts)_
 
 ## `oclif-example redirects:export CSVPATH`
 
@@ -88,7 +88,7 @@ EXAMPLE
   vtex redirects export csvPath
 ```
 
-_See code: [build/commands/redirects/export.ts](https://github.com/vtex/cli-plugin-redirects/blob/v0.1.2/build/commands/redirects/export.ts)_
+_See code: [build/commands/redirects/export.ts](https://github.com/vtex/cli-plugin-redirects/blob/v1.0.0/build/commands/redirects/export.ts)_
 
 ## `oclif-example redirects:import CSVPATH`
 
@@ -111,5 +111,5 @@ EXAMPLE
   vtex redirects import csvPath
 ```
 
-_See code: [build/commands/redirects/import.ts](https://github.com/vtex/cli-plugin-redirects/blob/v0.1.2/build/commands/redirects/import.ts)_
+_See code: [build/commands/redirects/import.ts](https://github.com/vtex/cli-plugin-redirects/blob/v1.0.0/build/commands/redirects/import.ts)_
 <!-- commandsstop -->

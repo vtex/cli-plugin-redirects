@@ -1,26 +1,33 @@
 {
   "name": "@vtex/cli-plugin-redirects",
   "description": "vtex plugin redirects",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "bugs": "https://github.com/vtex/cli-plugin-redirects/issues",
   "dependencies": {
     "@oclif/command": "^1",
-    "@oclif/config": "^1",
+    "@oclif/config": "^1.17.0",
     "@tiagonapoli/oclif-plugin-spaced-commands": "^0.0.6",
-    "@types/fs-extra": "^9.0.1",
-    "@types/json2csv": "^5.0.1",
-    "@types/progress": "^2.0.3",
-    "@types/ramda": "^0.27.14",
+    "@vtex/api": "3.77.0",
+    "ajv": "~6.10.2",
+    "crypto": "^1.0.1",
+    "csvtojson": "^2.0.10",
+    "fs-extra": "^10.0.0",
     "json-array-split": "^1.0.0",
     "json2csv": "^5.0.1",
+    "ora": "^5.4.1",
     "progress": "^2.0.3",
+    "ramda": "^0.27.1",
     "tslib": "^1"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1",
     "@oclif/plugin-help": "^3",
+    "@types/fs-extra": "^9.0.1",
     "@types/jest": "^26.0.3",
+    "@types/json2csv": "^5.0.1",
     "@types/node": "^14.0.14",
+    "@types/progress": "^2.0.3",
+    "@types/ramda": "0.27.14",
     "eslint": "^6.8.0",
     "eslint-config-oclif": "^3.1",
     "eslint-config-vtex": "^12.3.0",
@@ -33,8 +40,8 @@
     "prettier": "^2.0.1",
     "ts-jest": "^25.2.1",
     "ts-node": "^8",
-    "typescript": "^3.8.2",
-    "vtex": "^2.110.0"
+    "typescript": "^3.9.7",
+    "vtex": "^2.128.0"
   },
   "engines": {
     "node": ">=8.0.0"
