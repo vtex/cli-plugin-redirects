@@ -1,4 +1,5 @@
-import { AppGraphQLClient, InstanceOptions, IOContext } from '@vtex/api'
+import type { InstanceOptions, IOContext } from '@vtex/api'
+import { AppGraphQLClient } from '@vtex/api'
 import { IOClientFactory } from 'vtex'
 
 export interface RedirectInput {
@@ -40,32 +41,30 @@ export class Rewriter extends AppGraphQLClient {
   }
 
   public exportRedirects = (next?: string): Promise<ExportResponse> =>
-    this.graphql
-      .query<{ redirect: { listRedirects: ExportResponse } }, { next?: string }>(
+    this.http
+      .post<{ data: { redirect: { listRedirects: ExportResponse } } }>(
+        '',
         {
-          query: `
-      query ListRedirects($next: String) {
-        redirect {
-          listRedirects(next: $next) {
-            next
-            routes {
-              binding
-              from
-              to
-              type
-              endDate
-            }
-          }
-        }
-      }
-      `,
+          query: `query ListRedirects($next: String) {
+                    redirect {
+                      listRedirects(next: $next) {
+                        next
+                        routes {
+                          from
+                          to
+                          type
+                          endDate
+                        }
+                      }
+                    }
+                  }`,
           variables: { next },
         },
         {
           metric: 'rewriter-get-redirects',
         }
       )
-      .then((res) => res.data?.redirect?.listRedirects) as Promise<ExportResponse>
+      .then((res) => res.data.redirect?.listRedirects) as Promise<ExportResponse>
 
   public importRedirects = (routes: RedirectInput[]): Promise<boolean> =>
     this.graphql

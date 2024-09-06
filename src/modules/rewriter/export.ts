@@ -3,7 +3,8 @@ import { readJson, writeFile } from 'fs-extra'
 import { Parser } from 'json2csv'
 import ora from 'ora'
 import { createInterface } from 'readline'
-import { Redirect, Rewriter } from '../../clients/apps/Rewriter'
+import type { Redirect } from '../../clients/apps/Rewriter'
+import { Rewriter } from '../../clients/apps/Rewriter'
 import { SessionManager, logger, isVerbose } from 'vtex'
 import {
   deleteMetainfo,
