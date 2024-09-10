@@ -31,7 +31,7 @@ $ npm install -g @vtex/cli-plugin-redirects
 $ oclif-example COMMAND
 running command...
 $ oclif-example (-v|--version|version)
-@vtex/cli-plugin-redirects/1.0.0 linux-x64 node-v12.22.1
+@vtex/cli-plugin-redirects/1.0.0 linux-x64 node-v20.17.0
 $ oclif-example --help [COMMAND]
 USAGE
   $ oclif-example COMMAND
@@ -58,9 +58,9 @@ ARGUMENTS
   CSVPATH  CSV file containing the URL paths to delete.
 
 OPTIONS
-  -h, --help     show CLI help
-  -v, --verbose  Show debug level logs
-  --trace        Ensure all requests to VTEX IO are traced
+  -h, --help     Shows this help message.
+  -v, --verbose  Shows debug level logs.
+  --trace        Ensures all requests to VTEX IO are traced.
 
 EXAMPLE
   vtex redirects delete csvPath
@@ -80,9 +80,9 @@ ARGUMENTS
   CSVPATH  Name of the CSV file.
 
 OPTIONS
-  -h, --help     show CLI help
-  -v, --verbose  Show debug level logs
-  --trace        Ensure all requests to VTEX IO are traced
+  -h, --help     Shows this help message.
+  -v, --verbose  Shows debug level logs.
+  --trace        Ensures all requests to VTEX IO are traced.
 
 EXAMPLE
   vtex redirects export csvPath
@@ -102,10 +102,10 @@ ARGUMENTS
   CSVPATH  Name of the CSV file.
 
 OPTIONS
-  -h, --help     show CLI help
+  -h, --help     Shows this help message.
   -r, --reset    Removes all redirects previously defined.
-  -v, --verbose  Show debug level logs
-  --trace        Ensure all requests to VTEX IO are traced
+  -v, --verbose  Shows debug level logs.
+  --trace        Ensures all requests to VTEX IO are traced.
 
 EXAMPLE
   vtex redirects import csvPath
