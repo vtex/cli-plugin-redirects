@@ -1,7 +1,7 @@
 {
   "name": "@vtex/cli-plugin-redirects",
   "description": "vtex plugin redirects",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "bugs": "https://github.com/vtex/cli-plugin-redirects/issues",
   "dependencies": {
     "@oclif/command": "^1",
