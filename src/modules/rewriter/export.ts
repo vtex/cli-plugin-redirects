@@ -1,9 +1,10 @@
 import { createHash } from 'crypto'
-import { readJson, writeFile } from 'fs-extra'
-import { Parser } from 'json2csv'
+import { readJson } from 'fs-extra'
+import { createWriteStream } from 'fs'
+
 import ora from 'ora'
 import { createInterface } from 'readline'
-import type { Redirect } from '../../clients/apps/Rewriter'
+
 import { Rewriter } from '../../clients/apps/Rewriter'
 import { SessionManager, logger, isVerbose } from 'vtex'
 import {
@@ -32,54 +33,85 @@ const handleExport = async (csvPath: string) => {
 
   const spinner = ora('Exporting redirects....').start()
 
-  let { listOfRoutes, next } = exportMetainfo[indexHash]
+  let { routeCount, next } = exportMetainfo[indexHash]
     ? exportMetainfo[indexHash].data
-    : { listOfRoutes: [], next: undefined }
+    : { routeCount: 0, next: undefined }
 
   let count = 2
+  let writeStream: ReturnType<typeof createWriteStream> | null = null
+
+  const cleanup = () => {
+    if (writeStream && !writeStream.destroyed) {
+      writeStream.end()
+    }
+  }
 
   const listener = createInterface({ input: process.stdin, output: process.stdout }).on('SIGINT', () => {
-    saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, listOfRoutes })
+    saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, routeCount })
+    cleanup()
     console.log('\n')
     process.exit()
   })
 
-  const rewriter = Rewriter.createClient()
+  try {
+    // Create write stream and write CSV headers
+    writeStream = createWriteStream(`./${csvPath}`)
 
-  do {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const result = await rewriter.exportRedirects(next)
+    const headers = FIELDS.join(DELIMITER)
 
-      listOfRoutes = listOfRoutes.concat(result.routes)
+    writeStream.write(`${headers}\n`)
 
-      spinner.color = COLORS[count % COLORS.length] as any
-      spinner.text = `Exporting redirects....\t\t${listOfRoutes.length} Done`
-      next = result.next
-      count++
-    } catch (e) {
-      saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, listOfRoutes })
-      listener.close()
-      spinner.stop()
-      throw e
-    }
-  } while (next)
+    const rewriter = Rewriter.createClient()
 
-  spinner.stop()
+    do {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await rewriter.exportRedirects(next)
 
-  const json2csvParser = new Parser({ fields: FIELDS, delimiter: DELIMITER, quote: '' })
-  const encodedRoutes = listOfRoutes.map((route: Redirect) => ({
-    ...route,
-    from: encode(route.from),
-    to: encode(route.to),
-  }))
+        // Process and write each route immediately
+        for (const route of result.routes) {
+          const encodedRoute = {
+            ...route,
+            from: encode(route.from),
+            to: encode(route.to),
+          }
 
-  const csv = json2csvParser.parse(encodedRoutes)
+          // Manually format CSV row to avoid memory overhead of Parser
 
-  await writeFile(`./${csvPath}`, csv)
-  logger.info('Finished!\n')
-  listener.close()
-  deleteMetainfo(metainfo, EXPORTS, indexHash)
+          const csvRow = FIELDS.map((field) => {
+            const value = encodedRoute[field as keyof typeof encodedRoute] || ''
+
+            return `"${String(value).replace(/"/g, '""')}"`
+          }).join(DELIMITER)
+
+          writeStream.write(`${csvRow}\n`)
+          routeCount++
+        }
+
+        spinner.color = COLORS[count % COLORS.length] as any
+        spinner.text = `Exporting redirects....\t\t${routeCount} Done`
+        next = result.next
+        count++
+      } catch (e) {
+        saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, routeCount })
+        cleanup()
+        listener.close()
+        spinner.stop()
+        throw e
+      }
+    } while (next)
+
+    // Close the write stream
+    cleanup()
+    spinner.stop()
+
+    logger.info('Finished!\n')
+    listener.close()
+    deleteMetainfo(metainfo, EXPORTS, indexHash)
+  } catch (e) {
+    cleanup()
+    throw e
+  }
 }
 
 let retryCount = 0
