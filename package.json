@@ -95,11 +95,6 @@
     "version": "oclif readme && git add README.md",
     "watch": "yarn build-clean && yarn nodemon"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
-  },
   "lint-staged": {
     "*.{ts,js,tsx,jsx}": [
       "eslint --fix",
