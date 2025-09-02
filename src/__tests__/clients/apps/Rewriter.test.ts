@@ -1,5 +1,6 @@
 import '../../setup'
 import { jest } from '@jest/globals'
+import { IOContext } from '@vtex/api'
 
 // Mock external dependencies
 const mockIOClientFactory = {
@@ -28,10 +29,11 @@ jest.mock('vtex', () => ({
 
 // Import the class after mocking
 import { Rewriter, RedirectInput, Redirect, ExportResponse } from '../../../clients/apps/Rewriter'
+import { ParsedUrlQuery } from 'querystring'
 
 describe('Rewriter Client', () => {
   let rewriter: Rewriter
-  const mockContext = {
+  const mockContext: IOContext = {
     account: 'test-account',
     workspace: 'test-workspace',
     authToken: 'test-token',
@@ -39,7 +41,7 @@ describe('Rewriter Client', () => {
     production: false,
     product: '',
     platform: 'test-platform',
-    route: {},
+    route: { id: 'test-id', params: {} as ParsedUrlQuery },
     userAgent: 'test-agent',
     operationId: 'test-op',
     requestId: 'test-req',

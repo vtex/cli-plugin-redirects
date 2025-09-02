@@ -4,13 +4,13 @@ import { jest } from '@jest/globals'
 // Mock the export module function
 const mockRedirectsExport = jest.fn()
 
-jest.mock('../../../modules/rewriter/export', () => ({
+jest.mock('../../../modules/rewriter/export.js', () => ({
   __esModule: true,
   default: mockRedirectsExport,
 }))
 
 // Import the command after mocking
-import RedirectsExport from '../../../commands/redirects/export'
+import RedirectsExport from '../../../commands/redirects/export.js'
 
 describe('RedirectsExport Command', () => {
   let command: RedirectsExport

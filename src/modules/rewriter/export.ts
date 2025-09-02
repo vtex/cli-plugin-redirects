@@ -1,11 +1,13 @@
 import { createHash } from 'crypto'
-import { readJson } from 'fs-extra'
+import fsExtra from 'fs-extra'
 import { createWriteStream } from 'fs'
+
+const { readJson } = fsExtra
 
 import ora from 'ora'
 import { createInterface } from 'readline'
 
-import { Rewriter } from '../../clients/apps/Rewriter'
+import { Rewriter } from '../../clients/apps/Rewriter.js'
 import { SessionManager, logger, isVerbose } from 'vtex'
 import {
   deleteMetainfo,
@@ -17,7 +19,7 @@ import {
   saveMetainfo,
   showGraphQLErrors,
   sleep,
-} from './utils'
+} from './utils.js'
 
 const EXPORTS = 'exports'
 const MAX_CONCURRENT_REQUESTS = parseInt(process.env.EXPORT_CONCURRENCY ?? '5', 10) // Configurable concurrency limit
@@ -235,7 +237,7 @@ const handleExport = async (csvPath: string) => {
 
 let retryCount = 0
 
-export default async (csvPath: string) => {
+const redirectsExportFunc = async (csvPath: string) => {
   try {
     await handleExport(csvPath)
   } catch (e) {
@@ -253,6 +255,8 @@ export default async (csvPath: string) => {
     logger.info('Press CTRL+C to abort')
     await sleep(RETRY_INTERVAL_S * 1000)
     retryCount++
-    await module.exports.default(csvPath)
+    await redirectsExportFunc(csvPath)
   }
 }
+
+export default redirectsExportFunc

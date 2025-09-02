@@ -1,8 +1,10 @@
 import { createHash } from 'crypto'
-import { readFile, readJson } from 'fs-extra'
+import fsExtra from 'fs-extra'
+
+const { readFile, readJson } = fsExtra
 import { length, map } from 'ramda'
 import { createInterface } from 'readline'
-import { Rewriter } from '../../clients/apps/Rewriter'
+import { Rewriter } from '../../clients/apps/Rewriter.js'
 import { SessionManager, logger, isVerbose } from 'vtex'
 import {
   deleteMetainfo,
@@ -17,7 +19,7 @@ import {
   sleep,
   splitJsonArray,
   validateInput,
-} from './utils'
+} from './utils.js'
 
 const DELETES = 'deletes'
 const { account, workspace } = SessionManager.getSingleton()
@@ -47,7 +49,7 @@ const handleDelete = async (csvPath: string) => {
 
   validateInput(inputSchema, routes)
 
-  const allPaths = map(({ from }) => from, routes)
+  const allPaths = map(({ from }) => from, routes || [])
 
   const separatedPaths = splitJsonArray(allPaths)
 
@@ -83,7 +85,7 @@ const handleDelete = async (csvPath: string) => {
 
 let retryCount = 0
 
-export default async (csvPath: string) => {
+const redirectsDeleteFunc = async (csvPath: string) => {
   try {
     await handleDelete(csvPath)
   } catch (e) {
@@ -102,6 +104,8 @@ export default async (csvPath: string) => {
     logger.info('Press CTRL+C to abort')
     await sleep(RETRY_INTERVAL_S * 1000)
     retryCount++
-    await module.exports.default(csvPath)
+    await redirectsDeleteFunc(csvPath)
   }
 }
+
+export default redirectsDeleteFunc

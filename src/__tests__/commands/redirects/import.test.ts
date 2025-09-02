@@ -4,13 +4,13 @@ import { jest } from '@jest/globals'
 // Mock the import module function
 const mockRedirectsImport = jest.fn()
 
-jest.mock('../../../modules/rewriter/import', () => ({
+jest.mock('../../../modules/rewriter/import.js', () => ({
   __esModule: true,
   default: mockRedirectsImport,
 }))
 
 // Import the command after mocking
-import RedirectsImport from '../../../commands/redirects/import'
+import RedirectsImport from '../../../commands/redirects/import.js'
 
 describe('RedirectsImport Command', () => {
   let command: RedirectsImport
@@ -34,10 +34,10 @@ describe('RedirectsImport Command', () => {
     })
 
     it('should have correct args configuration', () => {
-      expect(RedirectsImport.args).toHaveLength(1)
+      expect(RedirectsImport.args).toBeDefined()
+      expect(RedirectsImport.args.csvPath).toBeDefined()
 
-      const csvPathArg = RedirectsImport.args[0]
-      expect(csvPathArg.name).toBe('csvPath')
+      const csvPathArg = RedirectsImport.args.csvPath
       expect(csvPathArg.required).toBe(true)
       expect(csvPathArg.description).toContain('Name of the CSV file')
     })

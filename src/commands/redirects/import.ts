@@ -1,27 +1,30 @@
-import { flags as oclifFlags } from '@oclif/command'
+import { Args, Flags, Command } from '@oclif/core'
+import { ColorifyConstants } from 'vtex'
+import redirectsImport from '../../modules/rewriter/import.js'
 
-import { CustomCommand, ColorifyConstants } from 'vtex'
-import redirectsImport from '../../modules/rewriter/import'
-
-export default class RedirectsImport extends CustomCommand {
-  static description = `Imports redirects from a CSV file to the current ${ColorifyConstants.ID(
+export default class RedirectsImport extends Command {
+  static override description = `Imports redirects from a CSV file to the current ${ColorifyConstants.ID(
     'account'
   )} and ${ColorifyConstants.ID('workspace')}.`
 
-  static examples = [`${ColorifyConstants.COMMAND_OR_VTEX_REF('vtex redirects import')} csvPath`]
+  static override examples = [`${ColorifyConstants.COMMAND_OR_VTEX_REF('vtex redirects import')} csvPath`]
 
-  static flags = {
-    ...CustomCommand.globalFlags,
-    reset: oclifFlags.boolean({ char: 'r', description: 'Removes all redirects previously defined.', default: false }),
+  static override flags = {
+    verbose: Flags.boolean({ description: 'Show verbose output' }),
+    help: Flags.help({ char: 'h' }),
+    trace: Flags.boolean({ description: 'Show stack trace on errors' }),
+    reset: Flags.boolean({ char: 'r', description: 'Removes all redirects previously defined.', default: false }),
   }
 
-  static args = [{ name: 'csvPath', required: true, description: 'Name of the CSV file.' }]
+  static override args = {
+    csvPath: Args.string({ required: true, description: 'Name of the CSV file.' }),
+  }
 
   async run() {
     const {
       args: { csvPath },
       flags: { reset },
-    } = this.parse(RedirectsImport)
+    } = await this.parse(RedirectsImport)
 
     await redirectsImport(csvPath, { reset })
   }

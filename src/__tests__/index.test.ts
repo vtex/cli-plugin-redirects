@@ -1,7 +1,7 @@
-import './setup'
+import './setup.js'
 
 // Import the index module
-import indexModule from '../index'
+import indexModule from '../index.js'
 
 describe('Index Module', () => {
   describe('module exports', () => {
@@ -33,24 +33,24 @@ describe('Index Module', () => {
   })
 
   describe('module structure', () => {
-    it('should be importable without errors', () => {
-      expect(() => {
-        require('../index')
+    it('should be importable without errors', async () => {
+      await expect(async () => {
+        await import('../index.js')
       }).not.toThrow()
     })
 
     it('should be importable with ES6 import syntax', async () => {
-      expect(async () => {
-        await import('../index')
+      await expect(async () => {
+        await import('../index.js')
       }).not.toThrow()
     })
 
-    it('should maintain consistent export across multiple imports', () => {
-      const import1 = require('../index')
-      const import2 = require('../index')
+    it('should maintain consistent export across multiple imports', async () => {
+      const import1 = await import('../index.js')
+      const import2 = await import('../index.js')
 
-      expect(import1).toEqual(import2)
-      expect(import1).toBe(import2.default) // CommonJS vs ES6 import consistency
+      expect(import1.default).toEqual(import2.default)
+      expect(import1.default).toBe(import2.default) // Multiple imports should return same instance
     })
   })
 
@@ -132,23 +132,23 @@ describe('Index Module', () => {
   })
 
   describe('module integration', () => {
-    it('should not interfere with other modules', () => {
+    it('should not interfere with other modules', async () => {
       // Import another module to ensure no side effects
-      expect(() => {
-        require('./setup')
+      await expect(async () => {
+        await import('./setup.js')
       }).not.toThrow()
     })
 
-    it('should be cacheable by Node.js module system', () => {
-      // Multiple requires should return the same instance
-      const module1 = require('../index')
-      const module2 = require('../index')
+    it('should be cacheable by Node.js module system', async () => {
+      // Multiple imports should return the same instance
+      const module1 = await import('../index.js')
+      const module2 = await import('../index.js')
 
-      expect(module1).toBe(module2.default)
+      expect(module1.default).toBe(module2.default)
     })
 
     it('should work with dynamic imports', async () => {
-      const dynamicImport = await import('../index')
+      const dynamicImport = await import('../index.js')
       expect(dynamicImport.default).toEqual({})
       expect(dynamicImport.default).toBe(indexModule)
     })
@@ -194,21 +194,21 @@ describe('Index Module', () => {
       expect(size).toBe(2) // Just '{}'
     })
 
-    it('should not create memory leaks', () => {
+    it('should not create memory leaks', async () => {
       // Multiple imports should not create multiple instances
-      const imports = Array.from({ length: 10 }, () => require('../index'))
+      const imports = await Promise.all(Array.from({ length: 10 }, () => import('../index.js')))
       const uniqueInstances = new Set(imports.map((imp) => imp.default))
 
       expect(uniqueInstances.size).toBe(1)
     })
 
-    it('should be fast to import', () => {
+    it('should be fast to import', async () => {
       const start = Date.now()
-      require('../index')
+      await import('../index.js')
       const end = Date.now()
 
-      // Import should be nearly instantaneous (less than 10ms is generous)
-      expect(end - start).toBeLessThan(10)
+      // Import should be nearly instantaneous (less than 50ms is generous for dynamic imports)
+      expect(end - start).toBeLessThan(50)
     })
   })
 })

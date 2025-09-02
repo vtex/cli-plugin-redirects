@@ -1,5 +1,5 @@
-module.exports = {
-  preset: 'ts-jest/presets/default',
+export default {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
@@ -8,10 +8,14 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        useESM: false,
+        useESM: true,
         tsconfig: {
-          target: 'es2020',
-          module: 'commonjs',
+          target: 'es2022',
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          allowSyntheticDefaultImports: true,
+          esModuleInterop: true,
+          verbatimModuleSyntax: false,
         },
       },
     ],
@@ -22,6 +26,9 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testTimeout: 10000,
   verbose: true,
-  extensionsToTreatAsEsm: [],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   globals: {},
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
 }

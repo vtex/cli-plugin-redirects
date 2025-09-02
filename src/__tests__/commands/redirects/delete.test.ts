@@ -4,13 +4,13 @@ import { jest } from '@jest/globals'
 // Mock the delete module function
 const mockRedirectsDelete = jest.fn()
 
-jest.mock('../../../modules/rewriter/delete', () => ({
+jest.mock('../../../modules/rewriter/delete.js', () => ({
   __esModule: true,
   default: mockRedirectsDelete,
 }))
 
 // Import the command after mocking
-import RedirectsDelete from '../../../commands/redirects/delete'
+import RedirectsDelete from '../../../commands/redirects/delete.js'
 
 describe('RedirectsDelete Command', () => {
   let command: RedirectsDelete

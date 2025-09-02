@@ -1,11 +1,13 @@
 import Ajv from 'ajv'
 import { createHash } from 'crypto'
 import csv from 'csvtojson'
-import { writeJsonSync } from 'fs-extra'
+import fsExtra from 'fs-extra'
 import jsonSplit from 'json-array-split'
 import ProgressBar from 'progress'
+
+const { writeJsonSync } = fsExtra
 import { compose, join, keys, map, match, pluck, prop, replace, sortBy, toLower } from 'ramda'
-import { Redirect } from '../../clients/apps/Rewriter'
+import { type Redirect } from '../../clients/apps/Rewriter.js'
 import { logger } from 'vtex'
 
 export const DELIMITER = ';'
@@ -68,8 +70,8 @@ export const progressBar = (message: string, curr: number, total: number) =>
     total,
   })
 
-const parseErrorDataPath = (dataPath: string) => {
-  return [match(/\[(.*?)\]/, dataPath)[1], match(/\.(.*?)$/, dataPath)[1]]
+const parseErrorInstancePath = (instancePath: string) => {
+  return [match(/\[(.*?)\]/, instancePath)[1], match(/\.(.*?)$/, instancePath)[1]]
 }
 
 export const validateInput = (schema: any, routes: any) => {
@@ -81,8 +83,8 @@ export const validateInput = (schema: any, routes: any) => {
   }
 
   logger.error('Errors validating input:')
-  map(({ message, params, dataPath }) => {
-    const [errorObjIndex, errorProp] = parseErrorDataPath(dataPath)
+  map(({ message, params, instancePath }) => {
+    const [errorObjIndex, errorProp] = parseErrorInstancePath(instancePath)
 
     console.error('-----')
     console.error(`${message} - in ${errorObjIndex} (${errorProp})`)

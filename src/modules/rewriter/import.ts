@@ -1,12 +1,14 @@
 import { createHash } from 'crypto'
-import { readFile, readJson, remove, writeFile } from 'fs-extra'
+import fsExtra from 'fs-extra'
+
+const { readFile, readJson, remove, writeFile } = fsExtra
 import { Parser } from 'json2csv'
 import { resolve } from 'path'
 import { difference, isEmpty, length, map, pluck } from 'ramda'
 import { createInterface } from 'readline'
-import { RedirectInput, Rewriter } from '../../clients/apps/Rewriter'
+import { Rewriter, type RedirectInput } from '../../clients/apps/Rewriter.js'
 import { SessionManager, logger, isVerbose } from 'vtex'
-import { default as deleteRedirects } from './delete'
+import deleteRedirects from './delete.js'
 import {
   deleteMetainfo,
   DELIMITER,
@@ -21,7 +23,7 @@ import {
   sleep,
   splitJsonArray,
   validateInput,
-} from './utils'
+} from './utils.js'
 
 const IMPORTS = 'imports'
 const { account, workspace } = SessionManager.getSingleton()
@@ -101,7 +103,7 @@ const handleImport = async (csvPath: string) => {
 
 let retryCount = 0
 
-export default async (csvPath: string, options: any) => {
+const redirectsImportFunc = async (csvPath: string, options: any): Promise<string[]> => {
   const reset = options ? options.r || options.reset : undefined
   let indexedRoutes
 
@@ -125,7 +127,7 @@ export default async (csvPath: string, options: any) => {
     logger.info('Press CTRL+C to abort')
     await sleep(RETRY_INTERVAL_S * 1000)
     retryCount++
-    importedRoutes = await module.exports.default(csvPath)
+    importedRoutes = await redirectsImportFunc(csvPath, options)
   }
 
   if (reset) {
@@ -150,3 +152,5 @@ export default async (csvPath: string, options: any) => {
 
   return importedRoutes
 }
+
+export default redirectsImportFunc
