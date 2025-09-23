@@ -151,7 +151,8 @@ class FileWriteQueue {
         const friendlyMessage = parseFileSystemError(error)
         const enhancedError = new Error(friendlyMessage)
 
-        enhancedError.cause = error
+        // Add cause property for better error tracking
+        ;(enhancedError as any).cause = error
         reject(enhancedError)
       }
     })
@@ -265,14 +266,14 @@ const handleExport = async (csvPath: string, config: ExportConfig) => {
         })
 
         // eslint-disable-next-line no-await-in-loop
-        const result = await Promise.race([
+        const result = (await Promise.race([
           retryWithBackoff(
             () => rewriter.exportRedirects(currentNext),
             { nextToken: currentNext, routeCount, spinner },
             { ...DEFAULT_RETRY_CONFIG, maxRetries: config.maxRetries }
           ),
           timeoutPromise,
-        ] as any)
+        ])) as { routes: any[]; next?: string }
 
         // Create page result for processing
         const pageResult: PageResult = {
