@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-09-02
+
+### Fixed
+
+- Allows exporting a large amount of redirects.
+
+## [1.0.1] - 2024-09-10
+
 ### Fixed
 
 - Use http POST instead of graphql client to list redirects
