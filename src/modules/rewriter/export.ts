@@ -4,6 +4,7 @@ import { createWriteStream } from 'fs'
 
 import ora from 'ora'
 import { createInterface } from 'readline'
+import * as readline from 'readline'
 
 import { Rewriter } from '../../clients/apps/Rewriter'
 import { SessionManager, logger, isVerbose } from 'vtex'
@@ -17,6 +18,12 @@ import {
   saveMetainfo,
   showGraphQLErrors,
   sleep,
+  classifyError,
+  sleepWithJitter,
+  calculateBackoffDelay,
+  DEFAULT_RETRY_CONFIG,
+  retryWithBackoff,
+  parseFileSystemError,
 } from './utils'
 
 const EXPORTS = 'exports'
@@ -25,6 +32,40 @@ const { account, workspace } = SessionManager.getSingleton()
 
 const COLORS = ['cyan', 'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'gray']
 const FIELDS = ['from', 'to', 'type', 'endDate', 'binding']
+
+const askUserIfShouldResume = async (savedData: { routeCount: number; next?: string }): Promise<boolean> => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+
+  return new Promise((resolve) => {
+    console.log(`\n📊 Found saved progress: ${savedData.routeCount} routes exported`)
+    if (savedData.next) {
+      console.log(`🔄 Last token: ${savedData.next.substring(0, 20)}...`)
+    }
+
+    rl.question('\nDo you want to continue from where you left off? (y/N): ', (answer) => {
+      rl.close()
+
+      const shouldResume = answer.toLowerCase().startsWith('y')
+
+      if (shouldResume) {
+        logger.info('Resuming from saved progress...')
+      } else {
+        logger.info('Starting fresh export...')
+      }
+
+      resolve(shouldResume)
+    })
+  })
+}
+
+interface ExportConfig {
+  maxConcurrentRequests: number
+  writeBatchSize: number
+  maxRetries: number
+}
 
 interface PageResult {
   pageIndex: number
@@ -107,7 +148,11 @@ class FileWriteQueue {
 
         resolve()
       } catch (error) {
-        reject(error)
+        const friendlyMessage = parseFileSystemError(error)
+        const enhancedError = new Error(friendlyMessage)
+
+        enhancedError.cause = error
+        reject(enhancedError)
       }
     })
   }
@@ -117,19 +162,51 @@ class FileWriteQueue {
   }
 }
 
-const handleExport = async (csvPath: string, maxConcurrentRequests: number, writeBatchSize: number) => {
+const handleExport = async (csvPath: string, config: ExportConfig) => {
   const indexHash = createHash('md5').update(`${account}_${workspace}_${csvPath}`).digest('hex')
   const metainfo = await readJson(METAINFO_FILE).catch(() => ({}))
   const exportMetainfo = metainfo[EXPORTS] || {}
 
-  const spinner = ora('Exporting redirects....').start()
+  // Debug: Log hash and available progress
+  logger.info(`Hash for ${csvPath}: ${indexHash}`)
+  logger.info(`Available progress entries: ${Object.keys(exportMetainfo).join(', ')}`)
 
-  let { routeCount, next } = exportMetainfo[indexHash]
-    ? exportMetainfo[indexHash].data
-    : { routeCount: 0, next: undefined }
+  // Check if our hash matches any saved progress
+  const hashMatches = Object.keys(exportMetainfo).includes(indexHash)
+
+  logger.info(`Hash matches saved progress: ${hashMatches}`)
+
+  // Check if there's saved progress
+  const hasSavedProgress = exportMetainfo[indexHash]?.data
+  let { routeCount, next } = hasSavedProgress ? exportMetainfo[indexHash].data : { routeCount: 0, next: undefined }
 
   // Ensure routeCount is a number
   routeCount = Number(routeCount) || 0
+
+  // Debug: Log what we found
+  if (hasSavedProgress) {
+    logger.info(`Found saved progress: routeCount=${routeCount}, next=${next ? 'yes' : 'no'}`)
+    logger.info(
+      `Condition check: hasSavedProgress=${hasSavedProgress}, routeCount > 0=${routeCount > 0}, next=${!!next}`
+    )
+  }
+
+  // If there's saved progress, ask user what to do
+  if (hasSavedProgress && (routeCount > 0 || next)) {
+    logger.info('Showing resume prompt to user...')
+    const shouldResume = await askUserIfShouldResume({ routeCount, next })
+
+    if (shouldResume) {
+      logger.info(`Resuming from token: ${next?.substring(0, 20)}... (${routeCount} routes already exported)`)
+    } else {
+      // User chose to start fresh - clear saved progress
+      deleteMetainfo(metainfo, EXPORTS, indexHash)
+      routeCount = 0
+      next = undefined
+    }
+  } else {
+    logger.info('No saved progress found or conditions not met - starting fresh')
+  }
 
   let count = 2
   let writeStream: ReturnType<typeof createWriteStream> | null = null
@@ -151,7 +228,7 @@ const handleExport = async (csvPath: string, maxConcurrentRequests: number, writ
   try {
     // Create write stream and write CSV headers
     writeStream = createWriteStream(`./${csvPath}`)
-    fileWriteQueue = new FileWriteQueue(writeStream, writeBatchSize)
+    fileWriteQueue = new FileWriteQueue(writeStream, config.writeBatchSize)
 
     const headers = FIELDS.join(DELIMITER)
 
@@ -163,11 +240,39 @@ const handleExport = async (csvPath: string, maxConcurrentRequests: number, writ
     let pageIndex = 0
     const pendingWrites: Array<Promise<number>> = []
 
+    const spinner = ora('Exporting redirects....').start()
+
     do {
       try {
-        // Fetch next page (this must be sequential due to pagination tokens)
+        // Fetch next page with enhanced retry logic
+        const currentNext = next
+
+        // Validate token format (should be base64 encoded) if we have a token
+        if (currentNext) {
+          try {
+            Buffer.from(currentNext, 'base64')
+          } catch (e) {
+            logger.warn('Invalid token format detected. Starting fresh export...')
+            next = undefined
+            routeCount = 0
+            continue
+          }
+        }
+
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout after 60 seconds')), 60000)
+        })
+
         // eslint-disable-next-line no-await-in-loop
-        const result = await rewriter.exportRedirects(next)
+        const result = await Promise.race([
+          retryWithBackoff(
+            () => rewriter.exportRedirects(currentNext),
+            { nextToken: currentNext, routeCount, spinner },
+            { ...DEFAULT_RETRY_CONFIG, maxRetries: config.maxRetries }
+          ),
+          timeoutPromise,
+        ] as any)
 
         // Create page result for processing
         const pageResult: PageResult = {
@@ -181,23 +286,77 @@ const handleExport = async (csvPath: string, maxConcurrentRequests: number, writ
 
         pendingWrites.push(writePromise)
 
+        // Update route count immediately for better user feedback
+        routeCount = Number(routeCount) + Number(result.routes.length)
+
         // Limit concurrent processing to prevent memory buildup
-        if (pendingWrites.length >= maxConcurrentRequests) {
+        if (pendingWrites.length >= config.maxConcurrentRequests) {
           // Wait for the oldest promise to complete
           // eslint-disable-next-line no-await-in-loop
-          const completedCount: number = await pendingWrites[0]
-
-          routeCount = Number(routeCount) + completedCount
+          await pendingWrites[0]
 
           // Remove the completed promise
           pendingWrites.shift()
         }
 
         spinner.color = COLORS[count % COLORS.length] as any
-        spinner.text = `Exporting redirects....\t\t${String(routeCount)} Done (Queue: ${fileWriteQueue.getQueueSize()})`
+        spinner.text = `Exporting redirects....\t\t${String(routeCount)} Done`
         next = result.next
         count++
       } catch (e) {
+        // Check for timeout errors
+        if (
+          e &&
+          typeof e === 'object' &&
+          'message' in e &&
+          typeof e.message === 'string' &&
+          e.message.includes('Request timeout')
+        ) {
+          logger.error('Request timed out. This might indicate an invalid token or API issues.')
+          logger.info('Clearing saved progress and starting fresh...')
+          deleteMetainfo(metainfo, EXPORTS, indexHash)
+          next = undefined
+          routeCount = 0
+          continue
+        }
+
+        // Check if it's a file system error first
+        if (
+          e &&
+          typeof e === 'object' &&
+          'message' in e &&
+          typeof e.message === 'string' &&
+          (e.message.includes('No space left') ||
+            e.message.includes('Permission denied') ||
+            e.message.includes('File system error'))
+        ) {
+          logger.error(`File system error: ${e.message}`)
+          cleanup()
+          listener.close()
+          spinner.stop()
+          throw e
+        }
+
+        // Enhanced error handling with token persistence
+        const errorInfo = classifyError(e)
+
+        // For 5xx errors, save the current token for recovery
+        if (errorInfo.type === 'server_error') {
+          logger.warn('Server error encountered. Saving current progress for recovery...')
+          saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, routeCount })
+        }
+
+        // For non-retryable errors, save progress and exit
+        if (!errorInfo.retryable) {
+          logger.error(`Non-retryable error: ${errorInfo.type}`)
+          saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, routeCount })
+          cleanup()
+          listener.close()
+          spinner.stop()
+          throw e
+        }
+
+        // For retryable errors that exhausted retries, save progress
         saveMetainfo(metainfo, EXPORTS, indexHash, 0, { next, routeCount })
         cleanup()
         listener.close()
@@ -207,12 +366,7 @@ const handleExport = async (csvPath: string, maxConcurrentRequests: number, writ
     } while (next)
 
     // Wait for all pending writes to complete
-
-    const remainingCounts = await Promise.all(pendingWrites)
-
-    const totalRemainingCount: number = remainingCounts.reduce((sum, routeCountFromPage) => sum + routeCountFromPage, 0)
-
-    routeCount = Number(routeCount) + totalRemainingCount
+    await Promise.all(pendingWrites)
 
     // Ensure all queued data is written
     while (fileWriteQueue.getQueueSize() > 0) {
@@ -235,24 +389,63 @@ const handleExport = async (csvPath: string, maxConcurrentRequests: number, writ
 
 let retryCount = 0
 
-export default async (csvPath: string, maxConcurrentRequests = 5, writeBatchSize = 100) => {
+export default async (
+  csvPath: string,
+  config: ExportConfig = { maxConcurrentRequests: 5, writeBatchSize: 100, maxRetries: 5 }
+) => {
   try {
-    await handleExport(csvPath, maxConcurrentRequests, writeBatchSize)
+    await handleExport(csvPath, config)
   } catch (e) {
-    logger.error('Error handling export\n')
+    // Check if it's a file system error first
+    if (
+      e &&
+      typeof e === 'object' &&
+      'message' in e &&
+      typeof e.message === 'string' &&
+      (e.message.includes('No space left') ||
+        e.message.includes('Permission denied') ||
+        e.message.includes('File system error'))
+    ) {
+      logger.error(`Export failed due to file system error: ${e.message}`)
+      process.exit(1)
+    }
+
+    const errorInfo = classifyError(e)
+
+    logger.error(`Export failed with error type: ${errorInfo.type}`)
     showGraphQLErrors(e)
+
     if (isVerbose) {
-      console.log(e)
+      console.log('Full error details:', e)
     }
 
+    // For non-retryable errors, exit immediately
+    if (!errorInfo.retryable) {
+      logger.error('Non-retryable error encountered. Exiting.')
+      process.exit(1)
+    }
+
+    // For retryable errors, use enhanced retry logic
     if (retryCount >= MAX_RETRIES) {
-      process.exit()
+      logger.error(`Maximum retries (${MAX_RETRIES}) exceeded. Exiting.`)
+      logger.info('You can resume the export by running the same command again.')
+      process.exit(1)
     }
 
-    logger.error(`Retrying in ${RETRY_INTERVAL_S} seconds...`)
+    // Calculate delay based on error type
+    let delay: number
+
+    if (errorInfo.type === 'rate_limit' && errorInfo.retryAfter) {
+      delay = errorInfo.retryAfter
+      logger.info(`Rate limited. Waiting ${Math.ceil(delay / 1000)}s as specified by Retry-After header`)
+    } else {
+      delay = calculateBackoffDelay(retryCount + 1, RETRY_INTERVAL_S * 1000, 60000) // Max 60s
+      logger.info(`Retrying in ${Math.ceil(delay / 1000)}s (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+    }
+
     logger.info('Press CTRL+C to abort')
-    await sleep(RETRY_INTERVAL_S * 1000)
+    await sleepWithJitter(delay)
     retryCount++
-    await module.exports.default(csvPath, maxConcurrentRequests, writeBatchSize)
+    await module.exports.default(csvPath, config)
   }
 }

@@ -22,6 +22,11 @@ export default class RedirectsExport extends CustomCommand {
       default: 100,
       description: 'Batch size for writing to file (default: 100)',
     }),
+    maxRetries: oclifFlags.integer({
+      char: 'r',
+      default: 5,
+      description: 'Maximum number of retries for failed requests (default: 5)',
+    }),
   }
 
   static args = [{ name: 'csvPath', required: true, description: 'Name of the CSV file.' }]
@@ -29,9 +34,13 @@ export default class RedirectsExport extends CustomCommand {
   async run() {
     const {
       args: { csvPath },
-      flags: { concurrency, batchSize },
+      flags: { concurrency, batchSize, maxRetries },
     } = this.parse(RedirectsExport)
 
-    await redirectsExport(csvPath, concurrency as number, batchSize as number)
+    await redirectsExport(csvPath, {
+      maxConcurrentRequests: concurrency as number,
+      writeBatchSize: batchSize as number,
+      maxRetries: maxRetries as number,
+    })
   }
 }
