@@ -20,8 +20,6 @@ import {
 } from './utils'
 
 const EXPORTS = 'exports'
-const MAX_CONCURRENT_REQUESTS = parseInt(process.env.EXPORT_CONCURRENCY ?? '5', 10) // Configurable concurrency limit
-const WRITE_BATCH_SIZE = parseInt(process.env.EXPORT_BATCH_SIZE ?? '100', 10) // Configurable batch size
 
 const { account, workspace } = SessionManager.getSingleton()
 
@@ -39,9 +37,11 @@ class FileWriteQueue {
   private nextExpectedPage = 0
   private writeStream: ReturnType<typeof createWriteStream>
   private isWriting = false
+  private batchSize: number
 
-  constructor(writeStream: ReturnType<typeof createWriteStream>) {
+  constructor(writeStream: ReturnType<typeof createWriteStream>, batchSize: number) {
     this.writeStream = writeStream
+    this.batchSize = batchSize
   }
 
   async addPage(pageResult: PageResult): Promise<number> {
@@ -79,7 +79,7 @@ class FileWriteQueue {
     return new Promise((resolve, reject) => {
       try {
         // Process routes in batches for better performance
-        const batchSize = WRITE_BATCH_SIZE
+        const { batchSize } = this
         let csvBatch = ''
 
         for (let i = 0; i < pageResult.routes.length; i++) {
@@ -117,7 +117,7 @@ class FileWriteQueue {
   }
 }
 
-const handleExport = async (csvPath: string) => {
+const handleExport = async (csvPath: string, maxConcurrentRequests: number, writeBatchSize: number) => {
   const indexHash = createHash('md5').update(`${account}_${workspace}_${csvPath}`).digest('hex')
   const metainfo = await readJson(METAINFO_FILE).catch(() => ({}))
   const exportMetainfo = metainfo[EXPORTS] || {}
@@ -151,7 +151,7 @@ const handleExport = async (csvPath: string) => {
   try {
     // Create write stream and write CSV headers
     writeStream = createWriteStream(`./${csvPath}`)
-    fileWriteQueue = new FileWriteQueue(writeStream)
+    fileWriteQueue = new FileWriteQueue(writeStream, writeBatchSize)
 
     const headers = FIELDS.join(DELIMITER)
 
@@ -182,7 +182,7 @@ const handleExport = async (csvPath: string) => {
         pendingWrites.push(writePromise)
 
         // Limit concurrent processing to prevent memory buildup
-        if (pendingWrites.length >= MAX_CONCURRENT_REQUESTS) {
+        if (pendingWrites.length >= maxConcurrentRequests) {
           // Wait for the oldest promise to complete
           // eslint-disable-next-line no-await-in-loop
           const completedCount: number = await pendingWrites[0]
@@ -235,9 +235,9 @@ const handleExport = async (csvPath: string) => {
 
 let retryCount = 0
 
-export default async (csvPath: string) => {
+export default async (csvPath: string, maxConcurrentRequests = 5, writeBatchSize = 100) => {
   try {
-    await handleExport(csvPath)
+    await handleExport(csvPath, maxConcurrentRequests, writeBatchSize)
   } catch (e) {
     logger.error('Error handling export\n')
     showGraphQLErrors(e)
@@ -253,6 +253,6 @@ export default async (csvPath: string) => {
     logger.info('Press CTRL+C to abort')
     await sleep(RETRY_INTERVAL_S * 1000)
     retryCount++
-    await module.exports.default(csvPath)
+    await module.exports.default(csvPath, maxConcurrentRequests, writeBatchSize)
   }
 }
