@@ -13,6 +13,7 @@ metadata:
     github.com/project-slug: vtex/cli-plugin-redirects
     backstage.io/techdocs-ref: dir:../
     vtex.com/application-id: LULV7DEQ
+    vtex.com/platform-flow-id: Shopper#1,Merch#3
 spec:
   lifecycle: stable
   owner: te-0029
