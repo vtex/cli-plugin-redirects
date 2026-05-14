@@ -14,6 +14,8 @@ metadata:
     backstage.io/techdocs-ref: dir:../
     vtex.com/application-id: LULV7DEQ
     vtex.com/platform-flow-id: Shopper#1,Merch#3
+    vtex.com/sdd-check-skip: 'true'
+    vtex.com/sdd-check-skip-reason: Public puglin for vtex toolbelt
 spec:
   lifecycle: stable
   owner: te-0029
