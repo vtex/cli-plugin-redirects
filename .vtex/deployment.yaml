@@ -1,5 +1,5 @@
 - name: cli-plugin-redirects
-  referenceId: PLACEHOLDER
+  referenceId: LULV7DEQ
   build:
     provider: dkcicd
     pipelines:
